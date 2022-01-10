@@ -335,34 +335,34 @@ contract YieldDirector is IYieldDirector, OlympusAccessControlled {
     /**
         @notice Convert flat sOHM value to agnostic value at current index
         @dev Agnostic value earns rebases. Agnostic value is amount / rebase_index.
-             1e9 is because sOHM has 9 decimals.
+             using 1e18 for agnostic value for precision reasons.
      */
     function _toAgnostic(uint256 amount_) internal view returns ( uint256 ) {
         return amount_
-            * 1e9
+            * 1e18
             / (IsOHM(sOHM).index());
     }
 
     /**
         @notice Convert agnostic value at current index to flat sOHM value
         @dev Agnostic value earns rebases. Agnostic value is amount / rebase_index.
-             1e9 is because sOHM has 9 decimals.
+             1e18 is because agnostic value has 18 decimals.
      */
     function _fromAgnostic(uint256 amount_) internal view returns ( uint256 ) {
         return amount_
             * (IsOHM(sOHM).index())
-            / 1e9;
+            / 1e18;
     }
 
     /**
         @notice Convert flat sOHM value to agnostic value at a given index value
         @dev Agnostic value earns rebases. Agnostic value is amount / rebase_index.
-             1e9 is because sOHM has 9 decimals.
+             1e18 is because agnostic value has 18 decimals.
      */
     function _fromAgnosticAtIndex(uint256 amount_, uint256 index_) internal pure returns ( uint256 ) {
         return amount_
             * index_
-            / 1e9;
+            / 1e18;
     }
 
     /************************
