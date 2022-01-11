@@ -109,6 +109,55 @@ contract YieldDirector is IYieldDirector, OlympusAccessControlled {
         emit Deposited(msg.sender, recipient_, amount_);
     }
 
+    function depositMultiple(uint256[] calldata amount_, address[] calldata recipients_) external {
+        require(!depositDisabled, "Deposits currently disabled");
+        require(amount_.length > 0, "Invalid deposit amount");
+        require(recipients_.length == amount_.length, "Invalid recipient address");
+
+        uint256 totalAmount = 0;
+        for (uint256 i = 0; i < amount_.length; i++) {
+            totalAmount += amount_[i];
+        }
+
+        IERC20(sOHM).safeTransferFrom(msg.sender, address(this), totalAmount);
+
+        uint256 index = IsOHM(sOHM).index();
+
+        DonationInfo[] storage donations = donationInfo[msg.sender];
+
+        for (uint256 i = 0; i < recipients_.length; i++) {
+            uint256 recipientIndex = _getRecipientIndex(msg.sender, recipients_[i]);
+
+            if(recipientIndex == MAX_UINT256) {
+            donations.push(
+                DonationInfo({
+                    recipient: recipients_[i],
+                    deposit: amount_[i],
+                    agnosticDeposit: _toAgnostic(amount_[i]),
+                    carry: 0,
+                    indexAtLastChange: index
+                })
+            );
+            } else {
+                DonationInfo storage donation = donations[recipientIndex];
+
+                donation.carry += _getAccumulatedValue(donation.agnosticDeposit, donation.indexAtLastChange);
+                donation.deposit += amount_[i];
+                donation.agnosticDeposit = _toAgnostic(donation.deposit);
+                donation.indexAtLastChange = index;
+            }
+
+            RecipientInfo storage recipient = recipientInfo[recipients_[i]];
+
+            recipient.carry += _getAccumulatedValue(recipient.agnosticDebt, recipient.indexAtLastChange);
+            recipient.totalDebt += amount_[i];
+            recipient.agnosticDebt = _toAgnostic(recipient.totalDebt + recipient.carry);
+            recipient.indexAtLastChange = index;
+
+            emit Deposited(msg.sender, recipients_[i], amount_[i]);
+        }
+    }
+
 
     /**
         @notice Withdraw donor's sOHM from vault and subtracts debt from recipient
