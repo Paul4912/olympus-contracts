@@ -3,8 +3,7 @@ pragma solidity >=0.7.5;
 
 interface IYieldStreamer {
 	function deposit(uint amount_, address recipient_, uint paymentInterval_) external;
-	function withdraw(uint amount_) external;
-	function withdrawAll() external;
+	function withdraw(uint id, uint amount_) external;
 	function upkeep() external;
     // any view functions needed?
 }
