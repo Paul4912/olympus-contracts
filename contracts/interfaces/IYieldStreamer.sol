@@ -2,8 +2,19 @@
 pragma solidity >=0.7.5;
 
 interface IYieldStreamer {
+	// Write Functions
 	function deposit(uint amount_, address recipient_, uint paymentInterval_, uint userMinimumDaiThreshold_) external;
-	function withdraw(uint id, uint amount_) external;
+	function addToDeposit(uint id_, uint amount_) external;
+	function withdrawPrincipal(uint id_, uint amount_) external;
+	function withdrawYield(uint id_) external;
+	function withdrawYieldAsDai(uint id_) external;
+	function withdrawAll(uint id_) external;
+	function updateUserMinDaiThreshold(uint id_, uint threshold_) external;
+	function updatePaymentInterval(uint id_, uint paymentInterval) external;
 	function upkeep() external;
-    // any view functions needed?
+
+    // View Functions
+	function getDepositIdsByRecipient(address recipient_) external view returns (uint256[] memory);
+	function upkeepEligibility() external view returns (uint256);
+	function getOutstandingYield(uint id_) external view returns (uint256);
 }
