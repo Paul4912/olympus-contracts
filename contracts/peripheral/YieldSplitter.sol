@@ -34,10 +34,7 @@ abstract contract YieldSplitter is OlympusAccessControlled {
         @param sOhm_ Address of SOHM.
         @param authority_ Address of Olympus authority contract.
     */
-    constructor(
-        address sOhm_,
-        address authority_
-    ) OlympusAccessControlled(IOlympusAuthority(authority_)) {
+    constructor(address sOhm_, address authority_) OlympusAccessControlled(IOlympusAuthority(authority_)) {
         require(sOhm_ != address(0), "Invalid address for sOHM");
         sOHM = sOhm_;
     }
@@ -73,10 +70,7 @@ abstract contract YieldSplitter is OlympusAccessControlled {
         @param id_ Id of the deposit.
         @param amount_ Amount of sOHM to withdraw.
     */
-    function _addToDeposit(
-        uint256 id_, 
-        uint256 amount_
-    ) internal {
+    function _addToDeposit(uint256 id_, uint256 amount_) internal {
         DepositInfo storage userDeposit = depositInfo[id_];
         userDeposit.principalAmount += amount_;
         userDeposit.agnosticAmount += _toAgnostic(amount_);
@@ -130,7 +124,8 @@ abstract contract YieldSplitter is OlympusAccessControlled {
 
         uint256[] storage depositorIdsArray = depositorIds[depositInfo[id_].depositor];
         for (uint256 i = 0; i < depositorIdsArray.length; i++) {
-            if (depositorIdsArray[i] == id_) { // Remove id from depositor's ids array
+            if (depositorIdsArray[i] == id_) {
+                // Remove id from depositor's ids array
                 depositorIdsArray[i] = depositorIdsArray[depositorIdsArray.length - 1]; // Delete integer from array by swapping with last element and calling pop()
                 depositorIdsArray.pop();
                 break;
@@ -139,7 +134,8 @@ abstract contract YieldSplitter is OlympusAccessControlled {
 
         uint256[] storage recipientIdsArray = depositorIds[depositInfo[id_].recipient];
         for (uint256 i = 0; i < recipientIdsArray.length; i++) {
-            if (recipientIdsArray[i] == id_) { // Remove id from depositor's ids array
+            if (recipientIdsArray[i] == id_) {
+                // Remove id from depositor's ids array
                 recipientIdsArray[i] = recipientIdsArray[recipientIdsArray.length - 1]; // Delete integer from array by swapping with last element and calling pop()
                 recipientIdsArray.pop();
                 break;
