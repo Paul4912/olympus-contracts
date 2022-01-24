@@ -3,7 +3,6 @@ pragma solidity ^0.8.10;
 
 import {YieldSplitter} from "../peripheral/YieldSplitter.sol";
 import {IgOHM} from "../interfaces/IgOHM.sol";
-import {OlympusAccessControlled, IOlympusAuthority} from "../types/OlympusAccessControlled.sol";
 
 /**
     @title YieldSplitterImpl
