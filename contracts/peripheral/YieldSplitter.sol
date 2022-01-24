@@ -2,26 +2,30 @@
 pragma solidity ^0.8.10;
 
 import {IERC20} from "../interfaces/IERC20.sol";
-import {IsOHM} from "../interfaces/IsOHM.sol";
+import {IgOHM} from "../interfaces/IgOHM.sol";
 import {SafeERC20} from "../libraries/SafeERC20.sol";
 import {OlympusAccessControlled, IOlympusAuthority} from "../types/OlympusAccessControlled.sol";
 
 /**
     @title YieldSplitter
-    @notice Abstract contract allows users to deposit their sOhm and have their yield
-            claimable by the specified recipient party.
+    @notice Abstract contract that allows users to create deposits for their gOHM and have 
+            their yield claimable by the specified recipient party. This contract's functions 
+            are designed to be as generic as possible. This contract's responsibility is
+            the accounting of the yield splitting. All other logic such as error handling,
+            emergency controls, sending and recieving gOHM is up to the implementation of 
+            this abstract contract to handle.
  */
 abstract contract YieldSplitter is OlympusAccessControlled {
     using SafeERC20 for IERC20;
 
-    address public immutable sOHM;
+    address public immutable gOHM;
 
     struct DepositInfo {
         uint256 id;
         address depositor;
         address recipient;
-        uint256 principalAmount; // Total amount of sOhm deposited as principal
-        uint256 agnosticAmount; // Total amount deposited priced in gOhm
+        uint256 principalAmount; // Total amount of sOhm deposited as principal, 9 decimals.
+        uint256 agnosticAmount; // Total amount deposited priced in gOhm. 18 decimals.
     }
 
     uint256 public idCount;
@@ -31,18 +35,18 @@ abstract contract YieldSplitter is OlympusAccessControlled {
 
     /**
         @notice Constructor
-        @param sOhm_ Address of SOHM.
+        @param gOHM_ Address of gOHM.
         @param authority_ Address of Olympus authority contract.
     */
-    constructor(address sOhm_, address authority_) OlympusAccessControlled(IOlympusAuthority(authority_)) {
-        require(sOhm_ != address(0), "Invalid address for sOHM");
-        sOHM = sOhm_;
+    constructor(address gOHM_, address authority_) OlympusAccessControlled(IOlympusAuthority(authority_)) {
+        require(gOHM_ != address(0), "Invalid address for gOHM");
+        gOHM = gOHM_;
     }
 
     /**
         @notice Create a deposit.
         @param depositor_ Address of depositor
-        @param amount_ Amount of sOHM.
+        @param amount_ Amount in gOhm. 18 decimals.
         @param recipient_ Address to direct staking yield to.
     */
     function _deposit(
@@ -57,8 +61,8 @@ abstract contract YieldSplitter is OlympusAccessControlled {
             id: idCount,
             depositor: depositor_,
             recipient: recipient_,
-            principalAmount: amount_,
-            agnosticAmount: _toAgnostic(amount_)
+            principalAmount: IgOHM(gOHM).balanceFrom(amount_),
+            agnosticAmount: amount_
         });
 
         depositId = idCount;
@@ -66,43 +70,45 @@ abstract contract YieldSplitter is OlympusAccessControlled {
     }
 
     /**
-        @notice Add more sOHM to the depositor's principal deposit.
+        @notice Add more gOhm to the depositor's principal deposit.
         @param id_ Id of the deposit.
-        @param amount_ Amount of sOHM to withdraw.
+        @param amount_ Amount of gOhm to add. 18 decimals.
     */
     function _addToDeposit(uint256 id_, uint256 amount_) internal {
         DepositInfo storage userDeposit = depositInfo[id_];
-        userDeposit.principalAmount += amount_;
-        userDeposit.agnosticAmount += _toAgnostic(amount_);
+        userDeposit.principalAmount += IgOHM(gOHM).balanceFrom(amount_);
+        userDeposit.agnosticAmount += amount_;
     }
 
     /**
         @notice Withdraw part of the principal amount deposited.
-        @dev Does not allow all the principal to be withdrawn. If you would like to do that use withdrawAll(). Reason is because we want to delete the element in the active deposits array after withdrawing all the principal.
         @param id_ Id of the deposit.
-        @param amount_ Amount of sOHM to withdraw.
+        @param amount_ Amount of gOHM to withdraw.
     */
     function _withdrawPrincipal(uint256 id_, uint256 amount_) internal {
         DepositInfo storage userDeposit = depositInfo[id_];
-        require(amount_ <= userDeposit.principalAmount, "amount greater than principal");
+        require(amount_ <= IgOHM(gOHM).balanceTo(userDeposit.principalAmount), "amount greater than principal");
 
-        userDeposit.principalAmount -= amount_;
-        userDeposit.agnosticAmount -= _toAgnostic(amount_);
+        userDeposit.principalAmount -= IgOHM(gOHM).balanceFrom(amount_);
+        userDeposit.agnosticAmount -= amount_;
     }
 
     /**
         @notice Redeem excess yield from your deposit in sOHM.
         @param id_ Id of the deposit.
+        @return amountRedeemed : amount of yield redeemed in gOHM. 18 decimals.
     */
     function _redeemYield(uint256 id_) internal returns (uint256 amountRedeemed) {
         DepositInfo storage userDeposit = depositInfo[id_];
 
-        userDeposit.agnosticAmount = _toAgnostic(userDeposit.principalAmount);
         amountRedeemed = _getOutstandingYield(userDeposit.principalAmount, userDeposit.agnosticAmount);
+        userDeposit.agnosticAmount = IgOHM(gOHM).balanceTo(userDeposit.principalAmount);
     }
 
     /**
         @notice Redeem all excess yield from your all deposits recipient can redeem from.
+        @param recipient_ Recipient that wants to redeem their yield.
+        @return amountRedeemed : amount of yield redeemed in gOHM. 18 decimals.
     */
     function _redeemAllYield(address recipient_) internal returns (uint256 amountRedeemed) {
         uint256[] storage recipientIdsArray = recipientIds[recipient_]; // Could probably optimise for gas. TODO later.
@@ -110,16 +116,20 @@ abstract contract YieldSplitter is OlympusAccessControlled {
         for (uint256 i = 0; i < recipientIdsArray.length; i++) {
             DepositInfo storage currentDeposit = depositInfo[recipientIdsArray[i]];
             amountRedeemed += _getOutstandingYield(currentDeposit.principalAmount, currentDeposit.agnosticAmount);
-            currentDeposit.agnosticAmount = _toAgnostic(currentDeposit.principalAmount);
+            currentDeposit.agnosticAmount = IgOHM(gOHM).balanceTo(currentDeposit.principalAmount);
         }
     }
 
     /**
-        @notice Withdraw all principal deposit, returns principal and agnostic amounts.
+        @notice Close a deposit. Remove all information in both the deposit info, depositorIds and recipientIds.
         @param id_ Id of the deposit.
+        @dev Internally for accounting reasons principal amount is stored in 9 decimal OHM terms. 
+        Since most implementations will work will gOHM, principal here is returned externally in 18 decimal gOHM terms.
+        @return principal : amount of principal that was deleted. in gOHM. 18 decimals.
+        @return agnosticAmount : total amount of gOHM deleted. Principal + Yield. 18 decimals.
     */
     function _closeDeposit(uint256 id_) internal returns (uint256 principal, uint256 agnosticAmount) {
-        principal = depositInfo[id_].principalAmount;
+        principal = IgOHM(gOHM).balanceTo(depositInfo[id_].principalAmount);
         agnosticAmount = depositInfo[id_].agnosticAmount;
 
         uint256[] storage depositorIdsArray = depositorIds[depositInfo[id_].depositor];
@@ -145,32 +155,11 @@ abstract contract YieldSplitter is OlympusAccessControlled {
         delete depositInfo[id_];
     }
 
-    /************************
-     * Utility Functions
-     ************************/
-
     /**
-        @notice Calculate outstanding yield based on principal sOhm and agnostic gOhm amount
+        @notice Calculate outstanding yield redeemable based on principal and agnosticAmount.
+        @return uint256 amount of yield in gOHM. 18 decimals.
      */
-    function _getOutstandingYield(uint256 principal, uint256 agnosticAmount) internal view returns (uint256) {
-        return _fromAgnostic(agnosticAmount) - principal;
-    }
-
-    /**
-        @notice Convert flat sOHM value to agnostic value(gOhm amount) at current index
-        @dev Agnostic value earns rebases. Agnostic value is amount / rebase_index.
-             1e18 is because gOhm has 18 decimals.
-     */
-    function _toAgnostic(uint256 amount_) internal view returns (uint256) {
-        return (amount_ * 1e18) / (IsOHM(sOHM).index());
-    }
-
-    /**
-        @notice Convert agnostic value(gOhm amount) at current index to flat sOHM value
-        @dev Agnostic value earns rebases. Agnostic value is amount / rebase_index.
-             1e18 is because gOHM has 18 decimals.
-     */
-    function _fromAgnostic(uint256 amount_) internal view returns (uint256) {
-        return (amount_ * (IsOHM(sOHM).index())) / 1e18;
+    function _getOutstandingYield(uint256 principal_, uint256 agnosticAmount_) internal view returns (uint256) {
+        return agnosticAmount_ - IgOHM(gOHM).balanceTo(principal_);
     }
 }
