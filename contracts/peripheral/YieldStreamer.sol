@@ -272,7 +272,7 @@ contract YieldStreamer is IYieldStreamer, YieldSplitter {
         for (uint256 i = 0; i < activeDepositIds.length; i++) {
             uint256 currentId = activeDepositIds[i];
 
-            if (isUpkeepEligible(currentId)) {
+            if (_isUpkeepEligible(currentId)) {
                 totalGOHM += getOutstandingYield(currentId);
                 upkeepInfo[currentId].lastUpkeepTimestamp = block.timestamp;
             }
@@ -298,7 +298,7 @@ contract YieldStreamer is IYieldStreamer, YieldSplitter {
             // TODO: Is there a more gas efficient way than looping through this again and checking same condition
             uint256 currentId = activeDepositIds[i];
 
-            if (isUpkeepEligible(currentId)) {
+            if (_isUpkeepEligible(currentId)) {
                 UpkeepInfo storage currentUpkeepInfo = upkeepInfo[currentId];
 
                 currentUpkeepInfo.unclaimedDai += (amounts[1] * _redeemYield(currentId)) / totalGOHM;
@@ -325,7 +325,7 @@ contract YieldStreamer is IYieldStreamer, YieldSplitter {
      */
     function upkeepEligibility() external view returns (uint256 numberOfDepositsEligible, uint256 amountOfYieldToSwap) {
         for (uint256 i = 0; i < activeDepositIds.length; i++) {
-            if (isUpkeepEligible(activeDepositIds[i])) {
+            if (_isUpkeepEligible(activeDepositIds[i])) {
                 numberOfDepositsEligible++;
                 amountOfYieldToSwap += getOutstandingYield(activeDepositIds[i]);
             }
@@ -344,7 +344,7 @@ contract YieldStreamer is IYieldStreamer, YieldSplitter {
         @notice Returns whether deposit id is eligible for upkeep
         @return bool
      */
-    function isUpkeepEligible(uint256 id_) public view returns (bool) {
+    function _isUpkeepEligible(uint256 id_) internal view returns (bool) {
         if (block.timestamp >= upkeepInfo[id_].lastUpkeepTimestamp + upkeepInfo[id_].paymentInterval) {
             return true;
         }
