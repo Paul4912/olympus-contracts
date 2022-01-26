@@ -8,7 +8,7 @@ import {IYieldStreamer} from "../interfaces/IYieldStreamer.sol";
 import {OlympusAccessControlled, IOlympusAuthority} from "../types/OlympusAccessControlled.sol";
 import {IUniswapV2Router} from "../interfaces/IUniswapV2Router.sol";
 import {IStaking} from "../interfaces/IStaking.sol";
-import {YieldSplitter} from "../peripheral/YieldSplitter.sol";
+import {YieldSplitter} from "../types/YieldSplitter.sol";
 
 /// Deposit function is disabled due to an emergency
 error DepositDisabled();
