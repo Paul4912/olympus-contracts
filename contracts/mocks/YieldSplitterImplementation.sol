@@ -7,14 +7,13 @@ import {IgOHM} from "../interfaces/IgOHM.sol";
 /**
     @title YieldSplitterImpl
     @notice Implements the abstract contract Yield Splitter by making all the internal functions public for testing purposes.
- */
+*/
 contract YieldSplitterImpl is YieldSplitter {
     /**
     @notice Constructor
     @param gOHM_ Address of gOHM.
-    @param authority_ Address of Olympus authority contract.
     */
-    constructor(address gOHM_, address authority_) YieldSplitter(gOHM_, authority_) {}
+    constructor(address gOHM_) YieldSplitter(gOHM_) {}
 
     /**
         @notice Create a deposit.
@@ -53,8 +52,9 @@ contract YieldSplitterImpl is YieldSplitter {
         @param id_ Id of the deposit.
         @return amountRedeemed : amount of yield redeemed in gOHM. 18 decimals.
     */
-    function redeemYield(uint256 id_) external returns (uint256 amountRedeemed) {
-        amountRedeemed = _redeemYield(id_);
+    function redeemYield(uint256 id_) external returns (uint256) {
+        uint256 amountRedeemed = _redeemYield(id_);
+        return amountRedeemed;
     }
 
     /**

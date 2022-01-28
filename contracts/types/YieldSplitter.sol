@@ -4,10 +4,7 @@ pragma solidity ^0.8.10;
 import {IERC20} from "../interfaces/IERC20.sol";
 import {IgOHM} from "../interfaces/IgOHM.sol";
 import {SafeERC20} from "../libraries/SafeERC20.sol";
-import {OlympusAccessControlled, IOlympusAuthority} from "../types/OlympusAccessControlled.sol";
 
-/// Input amount exceeds limit.
-error AmountExceedsLimit();
 
 /**
     @title YieldSplitter
@@ -18,7 +15,7 @@ error AmountExceedsLimit();
             emergency controls, sending and recieving gOHM is up to the implementation of
             this abstract contract to handle.
  */
-abstract contract YieldSplitter is OlympusAccessControlled {
+abstract contract YieldSplitter {
     using SafeERC20 for IERC20;
 
     address public immutable gOHM;
@@ -39,9 +36,8 @@ abstract contract YieldSplitter is OlympusAccessControlled {
     /**
         @notice Constructor
         @param gOHM_ Address of gOHM.
-        @param authority_ Address of Olympus authority contract.
     */
-    constructor(address gOHM_, address authority_) OlympusAccessControlled(IOlympusAuthority(authority_)) {
+    constructor(address gOHM_) {
         gOHM = gOHM_;
     }
 
@@ -89,9 +85,7 @@ abstract contract YieldSplitter is OlympusAccessControlled {
     */
     function _withdrawPrincipal(uint256 id_, uint256 amount_) internal {
         DepositInfo storage userDeposit = depositInfo[id_];
-        if (amount_ > IgOHM(gOHM).balanceTo(userDeposit.principalAmount)) revert AmountExceedsLimit();
-
-        userDeposit.principalAmount -= IgOHM(gOHM).balanceFrom(amount_);
+        userDeposit.principalAmount -= IgOHM(gOHM).balanceFrom(amount_); // Reverts if amount > principal due to underflow
         userDeposit.agnosticAmount -= amount_;
     }
 

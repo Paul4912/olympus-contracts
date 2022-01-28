@@ -28,7 +28,7 @@ error InvalidAmount();
     @notice This contract allows users to deposit their gOhm and have their yield
             converted into DAI and sent to their address every interval.
  */
-contract YieldStreamer is IYieldStreamer, YieldSplitter {
+contract YieldStreamer is IYieldStreamer, YieldSplitter, OlympusAccessControlled {
     using SafeERC20 for IERC20;
 
     address public immutable OHM;
@@ -82,7 +82,7 @@ contract YieldStreamer is IYieldStreamer, YieldSplitter {
         uint256 maxSwapSlippagePercent_,
         uint256 feeToDaoPercent_,
         uint256 minimumDaiThreshold_
-    ) YieldSplitter(gOHM_, authority_) {
+    ) YieldSplitter(gOHM_) OlympusAccessControlled(IOlympusAuthority(authority_)) {
         OHM = OHM_;
         DAI = DAI_;
         sushiRouter = IUniswapV2Router(sushiRouter_);
