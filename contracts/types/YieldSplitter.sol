@@ -5,7 +5,6 @@ import {IERC20} from "../interfaces/IERC20.sol";
 import {IgOHM} from "../interfaces/IgOHM.sol";
 import {SafeERC20} from "../libraries/SafeERC20.sol";
 
-
 /**
     @title YieldSplitter
     @notice Abstract contract that allows users to create deposits for their gOHM and have

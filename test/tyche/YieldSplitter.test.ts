@@ -13,8 +13,7 @@ import {
     YieldSplitterImpl,
 } from "../../types";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
-import { toDecimals, toOhm, advanceEpoch } from "../utils/Utilities"
-
+import { toDecimals, toOhm, advanceEpoch } from "../utils/Utilities";
 
 describe("YieldSplitter", async () => {
     const LARGE_APPROVAL = "100000000000000000000000000000000";
@@ -25,7 +24,7 @@ describe("YieldSplitter", async () => {
     const initialRewardRate = "1000";
 
     const triggerRebase = async () => {
-        advanceEpoch() // 8 hours per rebase
+        advanceEpoch(); // 8 hours per rebase
         await staking.rebase();
         return await sOhm.index();
     };
@@ -133,9 +132,7 @@ describe("YieldSplitter", async () => {
         await treasury.enable("2", dai.address, ZERO_ADDRESS);
 
         // Deposit 10,000 DAI to treasury, 1,000 OHM gets minted to deployer with 9000 as excess reserves (ready to be minted)
-        await treasury
-            .connect(deployer)
-            .deposit(toDecimals(10000), dai.address, toOhm(9000));
+        await treasury.connect(deployer).deposit(toDecimals(10000), dai.address, toOhm(9000));
 
         // Add staking as recipient of distributor with a test reward rate
         await distributor.addRecipient(staking.address, initialRewardRate);
@@ -148,12 +145,12 @@ describe("YieldSplitter", async () => {
 
         // Transfer 100 sOHM to alice for testing
         await sOhm.transfer(alice.address, toOhm(100));
-        
+
         // Alice should wrap ohm to gOhm. Should have 10gOhm
         await sOhm.approve(staking.address, LARGE_APPROVAL);
-        await staking.wrap(deployer.address, toOhm(500))
+        await staking.wrap(deployer.address, toOhm(500));
         await sOhm.connect(alice).approve(staking.address, LARGE_APPROVAL);
-        await staking.connect(alice).wrap(alice.address, toOhm(100))
+        await staking.connect(alice).wrap(alice.address, toOhm(100));
 
         await gOhm.connect(alice).approve(yieldSplitter.address, LARGE_APPROVAL);
     });
@@ -169,88 +166,130 @@ describe("YieldSplitter", async () => {
     });
 
     it("creating multiple deposits should update depositors and recipients arrays", async () => {
-        await yieldSplitter.deposit(deployer.address, alice.address, toDecimals(10))
-        await yieldSplitter.deposit(deployer.address, bob.address, toDecimals(10))
-        await yieldSplitter.deposit(alice.address, alice.address, toDecimals(5))
-        await yieldSplitter.deposit(alice.address, bob.address, toDecimals(5))
-        
-        await expect(await yieldSplitter.idCount()).is.equal('4');
-        await expect(await yieldSplitter.depositorIds(deployer.address, 0)).is.equal('0');
-        await expect(await yieldSplitter.depositorIds(deployer.address, 1)).is.equal('1');
-        await expect(await yieldSplitter.depositorIds(alice.address, 0)).is.equal('2');
-        await expect(await yieldSplitter.depositorIds(alice.address, 1)).is.equal('3');
-        await expect(await yieldSplitter.recipientIds(alice.address, 0)).is.equal('0');
-        await expect(await yieldSplitter.recipientIds(alice.address, 1)).is.equal('2');
-        await expect(await yieldSplitter.recipientIds(bob.address, 0)).is.equal('1');
-        await expect(await yieldSplitter.recipientIds(bob.address, 1)).is.equal('3');
+        await yieldSplitter.deposit(deployer.address, alice.address, toDecimals(10));
+        await yieldSplitter.deposit(deployer.address, bob.address, toDecimals(10));
+        await yieldSplitter.deposit(alice.address, alice.address, toDecimals(5));
+        await yieldSplitter.deposit(alice.address, bob.address, toDecimals(5));
+
+        await expect(await yieldSplitter.idCount()).is.equal("4");
+        await expect(await yieldSplitter.depositorIds(deployer.address, 0)).is.equal("0");
+        await expect(await yieldSplitter.depositorIds(deployer.address, 1)).is.equal("1");
+        await expect(await yieldSplitter.depositorIds(alice.address, 0)).is.equal("2");
+        await expect(await yieldSplitter.depositorIds(alice.address, 1)).is.equal("3");
+        await expect(await yieldSplitter.recipientIds(alice.address, 0)).is.equal("0");
+        await expect(await yieldSplitter.recipientIds(alice.address, 1)).is.equal("2");
+        await expect(await yieldSplitter.recipientIds(bob.address, 0)).is.equal("1");
+        await expect(await yieldSplitter.recipientIds(bob.address, 1)).is.equal("3");
         await expect((await yieldSplitter.depositInfo(0)).principalAmount).is.equal(toOhm(100));
         await expect((await yieldSplitter.depositInfo(3)).principalAmount).is.equal(toOhm(50));
-    });    
+    });
 
     it("adding to deposit should calculate agostic with changing index", async () => {
-        await yieldSplitter.deposit(deployer.address, alice.address, toDecimals(10)) //10 gOhm, 100 sOhm
+        await yieldSplitter.deposit(deployer.address, alice.address, toDecimals(10)); //10 gOhm, 100 sOhm
         await triggerRebase();
         await expect((await yieldSplitter.depositInfo(0)).principalAmount).is.equal(toOhm(100)); // still should be 100sOhm but less gOhm
         await expect((await yieldSplitter.depositInfo(0)).agnosticAmount).is.equal(toDecimals(10)); // still should be 100sOhm but less gOhm
-        await yieldSplitter.addToDeposit(0, toDecimals(10)) // add another 10gOhm, which is now 100.1 sOhm.
+        await yieldSplitter.addToDeposit(0, toDecimals(10)); // add another 10gOhm, which is now 100.1 sOhm.
         await expect((await yieldSplitter.depositInfo(0)).principalAmount).is.equal(toOhm(200.1)); // total sOhm should be 200.1
         await expect((await yieldSplitter.depositInfo(0)).agnosticAmount).is.equal(toDecimals(20)); // agnostic should be 20 gOhm.
-        const expectedYield = await gOhm.balanceTo(toOhm(0.1)) // yield is 0.1sOhm convert this to gOhm
-        const actualYield = await yieldSplitter.getOutstandingYield((await yieldSplitter.depositInfo(0)).principalAmount, (await yieldSplitter.depositInfo(0)).agnosticAmount)
-        await expect(actualYield).is.closeTo(expectedYield, 1) // 1 digit off due to precision issues of converting gOhm to sOhm and back to gOhm.
+        const expectedYield = await gOhm.balanceTo(toOhm(0.1)); // yield is 0.1sOhm convert this to gOhm
+        const actualYield = await yieldSplitter.getOutstandingYield(
+            (
+                await yieldSplitter.depositInfo(0)
+            ).principalAmount,
+            (
+                await yieldSplitter.depositInfo(0)
+            ).agnosticAmount
+        );
+        await expect(actualYield).is.closeTo(expectedYield, 1); // 1 digit off due to precision issues of converting gOhm to sOhm and back to gOhm.
     });
-    
+
     it("withdrawing principal only reduces principal amount", async () => {
-        await yieldSplitter.deposit(deployer.address, alice.address, toDecimals(10)) //10 gOhm, 100 sOhm
-        await yieldSplitter.withdrawPrincipal(0, toDecimals(5))
-        const principalAfter = (await yieldSplitter.depositInfo(0)).principalAmount
+        await yieldSplitter.deposit(deployer.address, alice.address, toDecimals(10)); //10 gOhm, 100 sOhm
+        await yieldSplitter.withdrawPrincipal(0, toDecimals(5));
+        const principalAfter = (await yieldSplitter.depositInfo(0)).principalAmount;
         await expect(principalAfter).is.equal(toOhm(50)); // should be 50 sOhm
-    });  
-    
+    });
+
     it("cannot withdraw more principal than there already is", async () => {
-        await yieldSplitter.deposit(deployer.address, alice.address, toDecimals(10)) //10 gOhm, 100 sOhm
-        await expect(yieldSplitter.withdrawPrincipal(0, toDecimals(100))).to.be.reverted
-    });  
+        await yieldSplitter.deposit(deployer.address, alice.address, toDecimals(10)); //10 gOhm, 100 sOhm
+        await expect(yieldSplitter.withdrawPrincipal(0, toDecimals(100))).to.be.reverted;
+    });
 
     it("closing a deposit deletes the item from mapping and depositor and recipient id arrays", async () => {
-        await yieldSplitter.deposit(deployer.address, alice.address, toDecimals(10))
-        await expect(await yieldSplitter.depositorIds(deployer.address, 0)).is.equal('0');
-        await expect(await yieldSplitter.recipientIds(alice.address, 0)).is.equal('0');
-        await yieldSplitter.closeDeposit(0)
-        await expect(yieldSplitter.depositorIds(deployer.address, 0)).to.be.reverted
-    });  
-    
+        await yieldSplitter.deposit(deployer.address, alice.address, toDecimals(10));
+        await expect(await yieldSplitter.depositorIds(deployer.address, 0)).is.equal("0");
+        await expect(await yieldSplitter.recipientIds(alice.address, 0)).is.equal("0");
+        await yieldSplitter.closeDeposit(0);
+        await expect(yieldSplitter.depositorIds(deployer.address, 0)).to.be.reverted;
+    });
+
     it("redeeming yield makes getOutstandingYield return 0", async () => {
-        await yieldSplitter.deposit(deployer.address, alice.address, toDecimals(10))
+        await yieldSplitter.deposit(deployer.address, alice.address, toDecimals(10));
         await triggerRebase();
-        const yieldBefore = await yieldSplitter.getOutstandingYield((await yieldSplitter.depositInfo(0)).principalAmount, (await yieldSplitter.depositInfo(0)).agnosticAmount)
-        await expect(yieldBefore).to.equal('9990009990009991')
-        await yieldSplitter.redeemYield(0)
-        const yieldAfter = await yieldSplitter.getOutstandingYield((await yieldSplitter.depositInfo(0)).principalAmount, (await yieldSplitter.depositInfo(0)).agnosticAmount)
-        await expect(yieldAfter).to.equal(0)
+        const yieldBefore = await yieldSplitter.getOutstandingYield(
+            (
+                await yieldSplitter.depositInfo(0)
+            ).principalAmount,
+            (
+                await yieldSplitter.depositInfo(0)
+            ).agnosticAmount
+        );
+        await expect(yieldBefore).to.equal("9990009990009991");
+        await yieldSplitter.redeemYield(0);
+        const yieldAfter = await yieldSplitter.getOutstandingYield(
+            (
+                await yieldSplitter.depositInfo(0)
+            ).principalAmount,
+            (
+                await yieldSplitter.depositInfo(0)
+            ).agnosticAmount
+        );
+        await expect(yieldAfter).to.equal(0);
     });
 
     it("redeem all redeems yield from all your deposits you are recipient of", async () => {
-        await yieldSplitter.deposit(deployer.address, alice.address, toDecimals(10))
-        await yieldSplitter.deposit(alice.address, alice.address, toDecimals(10))
-        await yieldSplitter.redeemAllYield(alice.address)
-        const yieldZero = await yieldSplitter.getOutstandingYield((await yieldSplitter.depositInfo(0)).principalAmount, (await yieldSplitter.depositInfo(0)).agnosticAmount)
-        const yieldOne = await yieldSplitter.getOutstandingYield((await yieldSplitter.depositInfo(1)).principalAmount, (await yieldSplitter.depositInfo(1)).agnosticAmount)
-        await expect(yieldZero).to.equal(0)
-        await expect(yieldOne).to.equal(0)
+        await yieldSplitter.deposit(deployer.address, alice.address, toDecimals(10));
+        await yieldSplitter.deposit(alice.address, alice.address, toDecimals(10));
+        await yieldSplitter.redeemAllYield(alice.address);
+        const yieldZero = await yieldSplitter.getOutstandingYield(
+            (
+                await yieldSplitter.depositInfo(0)
+            ).principalAmount,
+            (
+                await yieldSplitter.depositInfo(0)
+            ).agnosticAmount
+        );
+        const yieldOne = await yieldSplitter.getOutstandingYield(
+            (
+                await yieldSplitter.depositInfo(1)
+            ).principalAmount,
+            (
+                await yieldSplitter.depositInfo(1)
+            ).agnosticAmount
+        );
+        await expect(yieldZero).to.equal(0);
+        await expect(yieldOne).to.equal(0);
     });
 
     it("precision issue with gOHM conversion should not allow users to withdraw more than they have", async () => {
-        await gOhm.connect(deployer).transfer(bob.address, toDecimals(10))
-        await yieldSplitter.deposit(bob.address, bob.address, toDecimals(10))
+        await gOhm.connect(deployer).transfer(bob.address, toDecimals(10));
+        await yieldSplitter.deposit(bob.address, bob.address, toDecimals(10));
         await triggerRebase();
 
-        let harvestedYield = await yieldSplitter.getOutstandingYield((await yieldSplitter.depositInfo(0)).principalAmount, (await yieldSplitter.depositInfo(0)).agnosticAmount)
-        await gOhm.connect(bob).transfer(deployer.address, harvestedYield)
+        let harvestedYield = await yieldSplitter.getOutstandingYield(
+            (
+                await yieldSplitter.depositInfo(0)
+            ).principalAmount,
+            (
+                await yieldSplitter.depositInfo(0)
+            ).agnosticAmount
+        );
+        await gOhm.connect(bob).transfer(deployer.address, harvestedYield);
 
-        let principal = (await yieldSplitter.depositInfo(0)).principalAmount
-        let principalInGOHM = await gOhm.balanceTo(principal)
-        await gOhm.connect(bob).transfer(deployer.address, principalInGOHM)
-        await expect(await gOhm.balanceOf(bob.address)).is.equal(0)
+        let principal = (await yieldSplitter.depositInfo(0)).principalAmount;
+        let principalInGOHM = await gOhm.balanceTo(principal);
+        await gOhm.connect(bob).transfer(deployer.address, principalInGOHM);
+        await expect(await gOhm.balanceOf(bob.address)).is.equal(0);
     });
-})
+});
