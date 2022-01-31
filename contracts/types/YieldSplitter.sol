@@ -27,7 +27,7 @@ abstract contract YieldSplitter {
         uint256 agnosticAmount; // Total amount deposited priced in gOhm. 18 decimals.
     }
 
-    uint256 public idCount;
+    uint256 public idCount = 1;
     mapping(uint256 => DepositInfo) public depositInfo; // depositId -> DepositInfo
     mapping(address => uint256[]) public depositorIds; // address -> Array of the deposit id's deposited by user
     mapping(address => uint256[]) public recipientIds; // address -> Array of the deposit id's user is recipient of

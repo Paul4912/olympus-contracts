@@ -28,9 +28,10 @@ error InvalidAmount();
     @notice This contract allows users to deposit their gOhm and have their yield
             converted into DAI and sent to their address every interval.
  */
-contract YieldStreamer is IYieldStreamer, YieldSplitter, OlympusAccessControlled {
+contract YieldStreamer is IERC4626, YieldSplitter, OlympusAccessControlled {
     using SafeERC20 for IERC20;
 
+    address public immutable sOHM;
     address public immutable OHM;
     address public immutable DAI;
     IUniswapV2Router public immutable sushiRouter;
@@ -55,8 +56,6 @@ contract YieldStreamer is IYieldStreamer, YieldSplitter, OlympusAccessControlled
     mapping(uint256 => UpkeepInfo) public upkeepInfo; // depositId -> UpkeepInfo
     uint256[] public activeDepositIds; // All deposit ids that are not empty or deleted
 
-    event Deposited(address indexed depositor_, uint256 amount_);
-    event Withdrawn(address indexed depositor_, uint256 amount_);
     event UpkeepComplete(uint256 indexed timestamp);
     event EmergencyShutdown(bool active_);
 
@@ -74,6 +73,7 @@ contract YieldStreamer is IYieldStreamer, YieldSplitter, OlympusAccessControlled
     */
     constructor(
         address gOHM_,
+        address sOHM_,
         address OHM_,
         address DAI_,
         address sushiRouter_,
@@ -83,6 +83,7 @@ contract YieldStreamer is IYieldStreamer, YieldSplitter, OlympusAccessControlled
         uint256 feeToDaoPercent_,
         uint256 minimumDaiThreshold_
     ) YieldSplitter(gOHM_) OlympusAccessControlled(IOlympusAuthority(authority_)) {
+        sOHM = sOHM_;
         OHM = OHM_;
         DAI = DAI_;
         sushiRouter = IUniswapV2Router(sushiRouter_);
@@ -100,7 +101,7 @@ contract YieldStreamer is IYieldStreamer, YieldSplitter, OlympusAccessControlled
         @param recipient_ Address to direct staking yield and vault shares to.
         @param paymentInterval_ How much time must elapse before yield is able to be swapped for DAI.
     */
-    function deposit(
+    function createDeposit(
         uint256 amount_,
         address recipient_,
         uint256 paymentInterval_,
@@ -124,58 +125,69 @@ contract YieldStreamer is IYieldStreamer, YieldSplitter, OlympusAccessControlled
         emit Deposited(msg.sender, amount_);
     }
 
-    /**
-        @notice Add more gOHM to your principal deposit.
-        @param id_ Id of the deposit.
-        @param amount_ Amount of gOHM to add.
-    */
-    function addToDeposit(uint256 id_, uint256 amount_) external override {
+    // What to returns as shares? sOhm value???
+    function deposit(address recipient_, uint256 amount_) external override returns (uint256 shares) {
         if (depositDisabled) revert DepositDisabled();
 
+        uint256 depositId = _getRecipientId(recipient_);
+        if (depositId == 0) revert DepositDisabled(); // CREATE BETTER ERROR TODO
+
         IERC20(gOHM).safeTransferFrom(msg.sender, address(this), amount_);
+        _addToDeposit(depositId, amount_);
 
-        _addToDeposit(id_, amount_);
-
-        emit Deposited(msg.sender, amount_);
+        emit Deposit(msg.sender, recipient_, amount_);
     }
 
-    /**
-        @notice Withdraw part or all of your principal amount deposited.
-        @dev If withdrawing all your principal, all accumulated yield will be sent to recipient and deposit will be closed.
-        @param id_ Id of the deposit.
-        @param amount_ Amount of gOHM to withdraw.
-    */
-    function withdrawPrincipal(uint256 id_, uint256 amount_) external override {
-        if (withdrawDisabled) revert WithdrawDisabled();
-        if (depositInfo[id_].depositor != msg.sender) revert UnauthorisedAction();
+    // Same as deposit but use sOhm instead
+    // What to return as value, gOhm value?
+    function mint(address recipient_, uint256 sOhmAmount_) external override returns (uint256 gOHMAmount) {
+        if (depositDisabled) revert DepositDisabled();
 
-        if (amount_ >= IgOHM(gOHM).balanceTo(depositInfo[id_].principalAmount)) {
-            address recipient = depositInfo[id_].recipient;
-            uint256 unclaimedDai = upkeepInfo[id_].unclaimedDai;
+        uint256 depositId = _getRecipientId(recipient_);
+        if (depositId == 0) revert DepositDisabled(); // CREATE BETTER ERROR TODO
+
+        // transfer sOHM
+        IERC20(sOHM).safeTransferFrom(msg.sender, address(this), sOhmAmount_);
+
+        gOHMAmount = staking.wrap(address(this), sOhmAmount_);
+        _addToDeposit(depositId, gOHMAmount);
+
+        emit Deposit(msg.sender, recipient_, gOHMAmount);
+    }
+
+    // What to return as shares sOHM amount?
+    function withdraw(address recipient_, address to_, uint256 amount_) external returns (uint256 shares) {
+        if (withdrawDisabled) revert WithdrawDisabled();
+        uint256 depositId = _getRecipientId(recipient_);
+        if (depositInfo[depositId].depositor != msg.sender) revert UnauthorisedAction();
+
+        if (amount_ >= IgOHM(gOHM).balanceTo(depositInfo[depositId].principalAmount)) {
+            uint256 unclaimedDai = upkeepInfo[depositId].unclaimedDai;
             (uint256 principal, uint256 totalGOHM) = _closeDeposit(id_);
             delete upkeepInfo[id_];
 
             for (uint256 i = 0; i < activeDepositIds.length; i++) {
                 // Remove id_ from activeDepositIds
-                if (activeDepositIds[i] == id_) {
+                if (activeDepositIds[i] == depositId) {
                     activeDepositIds[i] = activeDepositIds[activeDepositIds.length - 1]; // Delete integer from array by swapping with last element and calling pop()
                     activeDepositIds.pop();
                     break;
                 }
             }
 
-            IERC20(gOHM).safeTransfer(msg.sender, principal);
-            IERC20(gOHM).safeTransfer(recipient, totalGOHM - principal);
+            IERC20(gOHM).safeTransfer(to_, totalGOHM);
             if (unclaimedDai != 0) {
-                IERC20(DAI).safeTransfer(recipient, unclaimedDai);
+                IERC20(DAI).safeTransfer(to_, unclaimedDai);
             }
+            emit Withdraw(msg.sender, to_, totalGOHM);
         } else {
-            _withdrawPrincipal(id_, amount_);
-            IERC20(gOHM).safeTransfer(msg.sender, amount_);
+            _withdrawPrincipal(depositId, amount_);
+            IERC20(gOHM).safeTransfer(to_, amount_);
+            emit Withdraw(msg.sender, to_, amount_);
         }
-
-        emit Withdrawn(msg.sender, amount_);
     }
+
+    // REDEEM SIMILAR TO WITHDRAW but unwraps and sends sOhm?
 
     /**
         @notice Withdraw excess yield from your deposit in gOHM.
@@ -349,6 +361,14 @@ contract YieldStreamer is IYieldStreamer, YieldSplitter, OlympusAccessControlled
             return true;
         }
         return false;
+    }
+
+    function _getRecipientId(address recipient_) internal view returns (uint256 id) {
+        for (uint256 i = 0; i < depositorIds[msg.sender].length; i++) {
+            if(depositInfo[depositorIds[msg.sender][i]].recipient == recipient_) {
+                id = depositorIds[msg.sender][i];
+            }
+        }
     }
 
     /************************
