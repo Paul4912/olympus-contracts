@@ -2,14 +2,21 @@
 pragma solidity ^0.8.10;
 
 interface IERC4626 {
-
     function deposit(address to, uint256 value) external returns (uint256 shares);
 
     function mint(address to, uint256 shares) external returns (uint256 value);
 
-    function withdraw(address from, address to, uint256 value) external returns (uint256 shares);
+    function withdraw(
+        address from,
+        address to,
+        uint256 value
+    ) external returns (uint256 shares);
 
-    function redeem(address from, address to, uint256 shares) external returns (uint256 value);
+    function redeem(
+        address from,
+        address to,
+        uint256 shares
+    ) external returns (uint256 value);
 
     function underlying() external view returns (address);
 

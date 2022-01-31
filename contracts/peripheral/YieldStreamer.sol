@@ -4,6 +4,7 @@ pragma solidity ^0.8.10;
 import {IERC20} from "../interfaces/IERC20.sol";
 import {IgOHM} from "../interfaces/IgOHM.sol";
 import {SafeERC20} from "../libraries/SafeERC20.sol";
+import {IERC4626} from "../interfaces/IERC4626.sol";
 import {IYieldStreamer} from "../interfaces/IYieldStreamer.sol";
 import {OlympusAccessControlled, IOlympusAuthority} from "../types/OlympusAccessControlled.sol";
 import {IUniswapV2Router} from "../interfaces/IUniswapV2Router.sol";
@@ -122,7 +123,7 @@ contract YieldStreamer is IERC4626, YieldSplitter, OlympusAccessControlled {
             userMinimumDaiThreshold: userMinimumDaiThreshold_
         });
 
-        emit Deposited(msg.sender, amount_);
+        emit Deposit(msg.sender, recipient_, amount_);
     }
 
     // What to returns as shares? sOhm value???
@@ -156,15 +157,19 @@ contract YieldStreamer is IERC4626, YieldSplitter, OlympusAccessControlled {
     }
 
     // What to return as shares sOHM amount?
-    function withdraw(address recipient_, address to_, uint256 amount_) external returns (uint256 shares) {
+    function withdraw(
+        address recipient_,
+        address to_,
+        uint256 amount_
+    ) external returns (uint256 shares) {
         if (withdrawDisabled) revert WithdrawDisabled();
         uint256 depositId = _getRecipientId(recipient_);
         if (depositInfo[depositId].depositor != msg.sender) revert UnauthorisedAction();
 
         if (amount_ >= IgOHM(gOHM).balanceTo(depositInfo[depositId].principalAmount)) {
             uint256 unclaimedDai = upkeepInfo[depositId].unclaimedDai;
-            (uint256 principal, uint256 totalGOHM) = _closeDeposit(id_);
-            delete upkeepInfo[id_];
+            (uint256 principal, uint256 totalGOHM) = _closeDeposit(depositId);
+            delete upkeepInfo[depositId];
 
             for (uint256 i = 0; i < activeDepositIds.length; i++) {
                 // Remove id_ from activeDepositIds
@@ -365,7 +370,7 @@ contract YieldStreamer is IERC4626, YieldSplitter, OlympusAccessControlled {
 
     function _getRecipientId(address recipient_) internal view returns (uint256 id) {
         for (uint256 i = 0; i < depositorIds[msg.sender].length; i++) {
-            if(depositInfo[depositorIds[msg.sender][i]].recipient == recipient_) {
+            if (depositInfo[depositorIds[msg.sender][i]].recipient == recipient_) {
                 id = depositorIds[msg.sender][i];
             }
         }
