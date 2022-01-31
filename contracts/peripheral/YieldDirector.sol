@@ -101,7 +101,7 @@ contract YieldDirector is IYieldDirector, OlympusAccessControlled {
         // Calculate value carried over since last change
         recipient.carry += _getAccumulatedValue(recipient.agnosticDebt, recipient.indexAtLastChange);
         recipient.totalDebt += amount_;
-        recipient.agnosticDebt = _toAgnostic(recipient.totalDebt + recipient.carry);
+        recipient.agnosticDebt += _toAgnostic(amount_);
         recipient.indexAtLastChange = index;
 
         emit Deposited(msg.sender, recipient_, amount_);
@@ -147,7 +147,7 @@ contract YieldDirector is IYieldDirector, OlympusAccessControlled {
         RecipientInfo storage recipient = recipientInfo[recipient_];
         recipient.carry += _getAccumulatedValue(recipient.agnosticDebt, recipient.indexAtLastChange);
         recipient.totalDebt -= amount_;
-        recipient.agnosticDebt = _toAgnostic(recipient.totalDebt + recipient.carry);
+        recipient.agnosticDebt -= _toAgnostic(amount_);
         recipient.indexAtLastChange = index;
 
         IERC20(sOHM).safeTransfer(msg.sender, amount_);
@@ -177,7 +177,7 @@ contract YieldDirector is IYieldDirector, OlympusAccessControlled {
             RecipientInfo storage recipient = recipientInfo[donation.recipient];
             recipient.carry += _getAccumulatedValue(recipient.agnosticDebt, recipient.indexAtLastChange);
             recipient.totalDebt -= donation.deposit;
-            recipient.agnosticDebt = _toAgnostic(recipient.totalDebt + recipient.carry);
+            recipient.agnosticDebt -= _toAgnostic(donation.deposit);
             recipient.indexAtLastChange = sOhmIndex;
 
             // Report amount donated

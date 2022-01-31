@@ -15,7 +15,7 @@ import {
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 //const { FakeContract, smock } = require("@defi-wonderland/smock");
 
-describe("YieldDirector", async () => {
+describe.only("YieldDirector", async () => {
     const LARGE_APPROVAL = "100000000000000000000000000000000";
     const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
     // Initial mint for Frax and DAI (10,000,000)
@@ -246,7 +246,7 @@ describe("YieldDirector", async () => {
         await expect(donationInfo1.deposit).is.equal("0");
 
         const recipientInfo2 = await tyche.recipientInfo(bob.address);
-        await expect(recipientInfo2.agnosticDebt).is.equal("9990009"); // .009~
+        await expect(recipientInfo2.agnosticDebt).is.equal("9990010"); // .010~
         await expect(recipientInfo2.carry).is.equal(donatedAmount);
         await expect(recipientInfo2.totalDebt).is.equal("0");
         await expect(await tyche.redeemableBalance(bob.address)).is.equal(donatedAmount);
@@ -279,15 +279,15 @@ describe("YieldDirector", async () => {
         await expect(await tyche.redeemableBalance(bob.address)).is.equal(donatedAmount);
 
         const recipientInfo1 = await tyche.recipientInfo(bob.address);
-        //await expect(await recipientInfo1.agnosticDebt).is.equal("9990010");
-        await expect(await recipientInfo1.agnosticDebt).is.equal("9990009");
+        await expect(await recipientInfo1.agnosticDebt).is.equal("9990010");
+        //await expect(await recipientInfo1.agnosticDebt).is.equal("9990009");
 
         // Second rebase
         await triggerRebase();
 
         const recipientInfo2 = await tyche.recipientInfo(bob.address);
-        //await expect(await recipientInfo2.agnosticDebt).is.equal("9990010"); // .009~
-        await expect(await recipientInfo2.agnosticDebt).is.equal("9990009"); // .009~
+        await expect(await recipientInfo2.agnosticDebt).is.equal("9990010"); // .009~
+        //await expect(await recipientInfo2.agnosticDebt).is.equal("9990009"); // .009~
         await expect(await tyche.redeemableBalance(bob.address)).is.equal("100100000"); // .1001
 
         // Trigger a few rebases
